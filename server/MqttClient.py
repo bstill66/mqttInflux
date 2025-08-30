@@ -1,4 +1,5 @@
 import logging
+import random
 import sys
 from time import sleep, time
 from typing import Callable
@@ -14,14 +15,19 @@ class MqttClient(object) :
     MAX_RECONNECT_DELAY = 60
 
 
-    def __init__(self, server: str = "localhost", port: int = 1883) :
+    def __init__(self, server: str = "localhost", port: int = 1883,user:str=None,passwd:str=None,clientID:str=None,) :
         # keep the server and port information
         self.server = server
         self.port = port
 
         # create the client instance (that does most of the work)
         self.mqClient = Client(callback_api_version=CallbackAPIVersion.VERSION2,
-                               userdata=self)
+                               userdata=self,
+                               clean_session=False,
+                               client_id=clientID)
+
+        if (user is not None) :
+            self.mqClient.username_pw_set(user,passwd)
 
         # setup the callbacks
         self.mqClient.on_connect    = self._onConnect
@@ -136,16 +142,21 @@ class MqttClient(object) :
 
 if __name__ == "__main__" :
     SERVER = "localhost"
+    USER   = "delta"
+    PWD    = "KeepClimbing!"
 
     if len(sys.argv) > 1:
         SERVER = sys.argv[1]
 
-    sub = MqttClient("localhost")
+
+    sub = MqttClient("localhost",user=USER,passwd=PWD,
+                     clientID=f"sub-{random.uniform(10_000,100_000)}")
 
     sub.run()
     sub.subscribe("flight/info", None,None)
 
-    pub = MqttClient("localhost")
+    pub = MqttClient("localhost",user=USER,passwd=PWD,
+                     clientID=f"pub-{random.uniform(10_000,100_000)}")
     pub.run()
 
 
