@@ -2,7 +2,7 @@ import json
 import random
 import sys
 from argparse import ArgumentParser, Namespace
-from datetime import datetime
+from datetime import datetime, timezone
 from time import sleep
 
 from client.ViasatMSI import ViasatMSI
@@ -33,7 +33,7 @@ class AircraftClient(object) :
                 "airspeed" : msiData["airspeed"]}
 
         payload = {"aircraft" : header,
-                   "timestamp": str(datetime.now()),
+                   "timestamp": str(datetime.now(timezone.utc)),
                    "data" : data
                    }
 

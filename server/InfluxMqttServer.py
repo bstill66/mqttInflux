@@ -1,6 +1,10 @@
 import json
+import os
 
 import random
+import sys
+from argparse import Namespace, ArgumentParser
+from datetime import datetime
 
 from time import sleep
 
@@ -10,21 +14,29 @@ from paho.mqtt.client import MQTTMessage
 
 
 
-from server.MqttClient import MqttClient
+from MqttClient import MqttClient
 from InfluxClient import InfluxClient
 
 
 
 
 
-MQTT_SERVER = "192.168.1.200"
+#MQTT_SERVER = "192.168.1.200"
 #MQTT_SERVER = "104.53.51.51"
-MQTT_USER   = "delta"
-MQTT_PWD    = "KeepClimbing!"
+#MQTT_USER   = "delta"
+#MQTT_PWD    = "KeepClimbing!"
 
-INFLUX_SERVER = "http://192.168.1.200:8086"
+#INFLUX_SERVER = "http://192.168.1.200:8086"
 #INFLUX_SERVER = "http://104.53.51.51:8086"
 INFLUX_APIKEY = "kwSpQ_8q-6cwAHgquFLhp6URqaq7134ROpHEUHMDLulH49GmU1OKdS2vXb0vB7VvdxZikGp_0RiGPc7Rk9kgrw=="
+
+
+import logging
+logger = logging.getLogger("InfluxMqttServer")
+
+
+
+
 
 class InfluxMqttServer (object) :
     FIRST_RECONNECT_DELAY = 1
@@ -39,16 +51,18 @@ class InfluxMqttServer (object) :
     def init(self) :
 
         self.dbase.createBucket("Aircraft")
+        logger.info(f"Successfully created bucket")
 
-        self.mqttClient.subscribe("Delta/N304DL/Viasat",lambda m,u: u.process(m),self)
-
+        topic = "Delta/N304DL/ViaSat"
+        self.mqttClient.subscribe(topic,lambda m,u: u.process(m),self)
+        logger.info(f"Subscribed to: '{topic}'")
 
     def parse(self,m:MQTTMessage) :
         asJson = None
 
         try:
             asJson = json.loads(m.payload)
-
+            logger.info(f"Parsed Received Message: {m.payload}")
         except json.JSONDecodeError as jde:
             pass
 
@@ -73,7 +87,7 @@ class InfluxMqttServer (object) :
             ts = data['aircraft']['timestamp']
             tmp = tmp.time(ts,write_precision=WritePrecision.S)
             p = tmp
-
+            logger.info(f"Successfully converted to Influx Point")
         except KeyError as ke:
             pass
 
@@ -87,31 +101,94 @@ class InfluxMqttServer (object) :
             pt,ts = self.cvtToPoint(m.topic,payload)
             if (pt is not None) :
                 self.dbase.write(ts,pt)
+                logger.info(f"Wrote Point to InfluxDB")
 
 
 
     def run(self) :
         self.init()
 
+        logger.info(f"Starting MQTT Subscriber/Listener")
         self.mqttClient.mqClient.loop_start()
 
 
     def terminate(self) :
+        logger.info(f"Terminating MQTT Client/Listener")
         self.mqttClient.terminate()
 
 
+def parseCmdLine(args) -> Namespace :
+
+    parser = ArgumentParser("MQTT Server that writes Aircraft data to InfluxDB")
+
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="specify output verbosity")
+    parser.add_argument("-L,--logdir",
+                        dest='logDir',
+                        default="/mnt/data",
+                        help="specify log file for GPS receiver")
+
+    parser.add_argument("-l,--log",
+                        dest='logLevel',
+                        default=logging.WARNING,
+                        help="specify log level")
+
+    parser.add_argument("-T,--test",
+                        dest='testMode',
+                        default=False,
+                        action="store_true",
+                        help="Enable Test Mode")
+
+    parser.add_argument("-i,--influx-server",
+                        dest='influxServer',
+                        default="http://localhost:8086",
+                        help="specify influx server")
+
+    parser.add_argument("-B,--bucket",
+                       dest="bucket",
+                       default="Aircraft",
+                       help="InfluxDB Bucket")
+
+
+
+    parser.add_argument("-b,--mqtt-broker",
+                        dest='mqttBroker',
+                        default="localhost",
+                        help="MQTT Broker URL")
+    parser.add_argument("-u,--user",
+                        dest="user",
+                        default="delta",
+                        help="MQTT User Name")
+
+    parser.add_argument("-p,--password",
+                        dest="password",
+                        default="KeepClimbing!",
+                        help="MQTT Password")
+
+    return parser.parse_args(args)
 
 
 if __name__ == "__main__" :
-    db = InfluxClient(INFLUX_SERVER,"Flight",org="Brian Still",token=INFLUX_APIKEY)
 
-    mqtt = MqttClient(MQTT_SERVER,1883,user=MQTT_USER,passwd=MQTT_PWD,
+    params = parseCmdLine(sys.argv[1:])
+    try:
+        level = getattr(logging, params.logLevel.upper())
+    except AttributeError as ae:
+        level = logging.ERROR
+
+
+    logfile = os.path.join(params.logDir,datetime.now().strftime("InfluxMqtt_%Y%m%d_%H%M%S.log"))
+    logging.basicConfig(filename=logfile, encoding='utf-8', level=level)
+
+    db = InfluxClient(params.influxServer,params.bucket,org="Brian Still",token=INFLUX_APIKEY)
+
+    mqtt = MqttClient(params.mqttBroker,1883,user=params.user,passwd=params.password,
                       clientID=f"infdb-{random.randint(0,10_000):06d}")
     mqtt.run()
 
     mqClient = InfluxMqttServer(db, mqtt)
 
-    pub = MqttClient(MQTT_SERVER,1883,user=MQTT_USER,passwd=MQTT_PWD,
+    pub = MqttClient(params.mqttBroker,1883,user=params.user,passwd=params.password,
                      clientID=f"test-{random.randint(0,10_000)}")
     pub.run()
 
@@ -132,14 +209,16 @@ if __name__ == "__main__" :
         mqClient.run()
 
         while True:
-            msg = genTestMsg()
-
-            pub.publish("Delta/N304DL/Viasat",msg)
+            if params.testMode:
+                logger.info(f"Generating Test message")
+                msg = genTestMsg()
+                pub.publish("Delta/N304DL/Viasat",msg)
             sleep(1)
 
     except ApiException as e :
         pass
     except KeyboardInterrupt as e :
+        logger.info("Exiting....cleanup up clients")
         mqClient.terminate()
         pub.terminate()
 
