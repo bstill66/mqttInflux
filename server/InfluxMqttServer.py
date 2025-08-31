@@ -213,10 +213,10 @@ if __name__ == "__main__" :
                 logger.info(f"Generating Test message")
                 msg = genTestMsg()
                 pub.publish("Delta/N304DL/Viasat",msg)
-            sleep(1)
+            sleep(5)
 
     except ApiException as e :
-        pass
+        logger.exception(e)
     except KeyboardInterrupt as e :
         logger.info("Exiting....cleanup up clients")
         mqClient.terminate()

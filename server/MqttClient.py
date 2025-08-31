@@ -7,6 +7,9 @@ from typing import Callable
 from paho.mqtt.client import Client
 from paho.mqtt.enums import CallbackAPIVersion
 
+import logging
+
+logger = logging.getLogger("MqttClient")
 
 class MqttClient(object) :
     FIRST_RECONNECT_DELAY = 1
@@ -44,6 +47,7 @@ class MqttClient(object) :
 
     @staticmethod
     def _onConnect(client, ud, flags, rc, prop) :
+        logger.info("Connected to MQTT Broker @ {self.server}:{self.port}")
         if hasattr(ud,'onConnect') :
             ud.onConnect(client,flags,rc,prop)
 

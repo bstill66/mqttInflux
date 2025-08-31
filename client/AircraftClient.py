@@ -8,7 +8,8 @@ from time import sleep
 from client.ViasatMSI import ViasatMSI
 from server.MqttClient import MqttClient
 
-
+import logging
+logger = logging.getLogger("AircraftClient")
 
 class AircraftClient(object) :
     def __init__(self,acId:str,mqttClient:MqttClient,msi="https://msi.viasat.com:9100/v1/flight") :
@@ -81,7 +82,7 @@ def parseCmdLine(args) -> Namespace :
 
     parser.add_argument("-b,--mqtt-broker",
                         dest='mqttBroker',
-                        default="localhost",
+                        default="104.53.51.51",
                         help="MQTT Broker URL")
     parser.add_argument("-u,--user",
                         dest="userName",
