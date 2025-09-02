@@ -23,7 +23,7 @@ class AircraftClient(object) :
 
     def publish(self,msiData) :
         header = {"tailNum" : self.acId,
-                  "flightNum" : "###",
+                  "flightNum" : msiData["flightNumber"],
                   "timestamp" : msiData["timestamp"]}
 
         data = {"latitude" : msiData["latitude"],

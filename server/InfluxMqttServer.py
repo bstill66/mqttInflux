@@ -53,7 +53,7 @@ class InfluxMqttServer (object) :
         self.dbase.createBucket("Aircraft")
         logger.info(f"Successfully created bucket")
 
-        topic = "Delta/N304DL/ViaSat"
+        topic = "Delta/+/Viasat"
         self.mqttClient.subscribe(topic,lambda m,u: u.process(m),self)
         logger.info(f"Subscribed to: '{topic}'")
 
@@ -64,7 +64,7 @@ class InfluxMqttServer (object) :
             asJson = json.loads(m.payload)
             logger.info(f"Parsed Received Message: {m.payload}")
         except json.JSONDecodeError as jde:
-            pass
+            logger.warning(f"Parse error: {m.payload}")
 
         return asJson
 
@@ -89,7 +89,7 @@ class InfluxMqttServer (object) :
             p = tmp
             logger.info(f"Successfully converted to Influx Point")
         except KeyError as ke:
-            pass
+            logger.error(f"Invalid key {ke}")
 
         return p,ts
 
@@ -130,7 +130,7 @@ def parseCmdLine(args) -> Namespace :
 
     parser.add_argument("-l,--log",
                         dest='logLevel',
-                        default=logging.WARNING,
+                        default=logging.INFO,
                         help="specify log level")
 
     parser.add_argument("-T,--test",
@@ -174,11 +174,12 @@ if __name__ == "__main__" :
     try:
         level = getattr(logging, params.logLevel.upper())
     except AttributeError as ae:
-        level = logging.ERROR
+        level = logging.INFO
 
 
     logfile = os.path.join(params.logDir,datetime.now().strftime("InfluxMqtt_%Y%m%d_%H%M%S.log"))
     logging.basicConfig(filename=logfile, encoding='utf-8', level=level)
+    logger.info("Starting InfluxMqttServer")
 
     db = InfluxClient(params.influxServer,params.bucket,org="Brian Still",token=INFLUX_APIKEY)
 
