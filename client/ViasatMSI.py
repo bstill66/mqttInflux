@@ -1,4 +1,5 @@
 import json
+import logging
 import sys
 from datetime import datetime, timezone
 
@@ -38,6 +39,8 @@ class ViasatMSI(object) :
                 jsonRsp = json.loads(rsp.text)
 
                 return jsonRsp
+            else:
+                logging.error(f"Unable to query MSI: {rsp.status_code}")
         except Exception as e :
             pass
 

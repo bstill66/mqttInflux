@@ -50,7 +50,7 @@ class MqttClient(object) :
 
     @staticmethod
     def _onConnect(client, ud, flags, rc, prop) :
-        logger.info("Connected to MQTT Broker @ {self.server}:{self.port}")
+        logger.info(f"Connected to MQTT Broker @ {ud.server}:{ud.port}")
         if hasattr(ud,'onConnect') :
             ud.onConnect(client,flags,rc,prop)
 
@@ -95,7 +95,7 @@ class MqttClient(object) :
 
     def onMessage(self,client:Client,msg) :
         self.subRxCount += 1
-        logging.info("Message received: " + str(msg.payload))
+        logging.info(f"Message received: " + str(msg.payload))
 
         for k in self.topics:
             pat,usrFunc,usrData = self.topics[k]

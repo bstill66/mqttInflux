@@ -1,11 +1,12 @@
 import json
+import os
 import random
 import sys
 from argparse import ArgumentParser, Namespace
 from datetime import datetime, timezone
 from time import sleep
 
-from client.ViasatMSI import ViasatMSI
+from ViasatMSI import ViasatMSI
 from server.MqttClient import MqttClient
 
 import logging
@@ -40,6 +41,7 @@ class AircraftClient(object) :
 
         payloadStr = json.dumps(payload)
 
+        logger.info(f"Publishing to {self.topic}: {payloadStr}")
         self.mqttClient.publish(self.topic,payloadStr)
 
 
@@ -51,6 +53,7 @@ class AircraftClient(object) :
             sleep(3)
             data = self.api.query()
             if (data is not None) :
+                logger.info(f"Received message from MSI {data}")
                 self.publish(data)
 
 
@@ -64,9 +67,9 @@ def parseCmdLine(args) -> Namespace :
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="specify output verbosity")
     parser.add_argument("-l,--logdir",
-                        dest='logfile',
+                        dest='logDir',
                         default=None,
-                        help="specify log file for GPS receiver")
+                        help="specify log directory")
 
     parser.add_argument("-A,--aircraft",
                         dest="acID",
@@ -100,6 +103,22 @@ def parseCmdLine(args) -> Namespace :
 if __name__ == "__main__" :
 
     params = parseCmdLine(sys.argv[1:])
+    try:
+        level = getattr(logging, params.logLevel.upper())
+    except AttributeError as ae:
+        level = logging.INFO
+
+    except Exception as e:
+        level = logging.INFO
+
+    if params.logDir is not None:
+        logfile = os.path.join(params.logDir,datetime.now().strftime("AcClient_%Y%m%d_%H%M%S.log"))
+        logging.basicConfig(filename=logfile, encoding='utf-8', level=level)
+    else:
+        logging.basicConfig(level=level)
+
+    logger.info("Starting Aircraft Client")
+    logger.info(f"Broker: {params.mqttBroker}, User: {params.userName}")
 
     clientId = f"{params.acID}-{random.randint(1_000,10_000)}"
 
