@@ -14,7 +14,7 @@ from paho.mqtt.client import MQTTMessage
 
 
 
-from MqttClient import MqttClient
+from common.MqttClient import MqttClient
 from InfluxClient import InfluxClient
 
 
@@ -155,12 +155,12 @@ def parseCmdLine(args) -> Namespace :
                         dest='mqttBroker',
                         default="localhost",
                         help="MQTT Broker URL")
-    parser.add_argument("-u,--user",
+    parser.add_argument("-u","--user",
                         dest="user",
                         default="delta",
                         help="MQTT User Name")
 
-    parser.add_argument("-p,--password",
+    parser.add_argument("-p","--password",
                         dest="password",
                         default="KeepClimbing!",
                         help="MQTT Password")
@@ -189,9 +189,10 @@ if __name__ == "__main__" :
 
     mqClient = InfluxMqttServer(db, mqtt)
 
-    pub = MqttClient(params.mqttBroker,1883,user=params.user,passwd=params.password,
-                     clientID=f"test-{random.randint(0,10_000)}")
-    pub.run()
+    if params.testMode:
+        pub = MqttClient(params.mqttBroker,1883,user=params.user,passwd=params.password,
+                         clientID=f"test-{random.randint(0,10_000)}")
+        pub.run()
 
 
     def genTestMsg() :

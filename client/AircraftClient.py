@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from time import sleep
 
 from ViasatMSI import ViasatMSI
-from server.MqttClient import MqttClient
+from common.MqttClient import MqttClient
 
 import logging
 logger = logging.getLogger("AircraftClient")
@@ -25,23 +25,20 @@ class AircraftClient(object) :
     def publish(self,msiData) :
         header = {"tailNum" : self.acId,
                   "flightNum" : msiData["flightNumber"],
-                  "timestamp" : msiData["timestamp"]}
-
-        data = {"latitude" : msiData["latitude"],
-                "longitude" : msiData["longitude"],
-                "altitude" : msiData["altitude"],
-                "groundSpd": msiData["groundspeed"],
-                "heading" : msiData["heading"],
-                "airspeed" : msiData["airspeed"]}
+                  "timestamp" : msiData["timestamp"],
+                  "flightID"  : msiData["flightId"]}
 
         payload = {"aircraft" : header,
                    "timestamp": str(datetime.now(timezone.utc)),
-                   "data" : data
+                   "data" : msiData
                    }
 
         payloadStr = json.dumps(payload)
+        topic = msiData['vehicleId']
+        del msiData['vehicleId']
 
-        logger.info(f"Publishing to {self.topic}: {payloadStr}")
+
+        logger.info(f"Publishing to {topic}: {payloadStr}")
         self.mqttClient.publish(self.topic,payloadStr)
 
 
@@ -66,7 +63,7 @@ def parseCmdLine(args) -> Namespace :
 
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="specify output verbosity")
-    parser.add_argument("-l,--logdir",
+    parser.add_argument("-L","--logdir",
                         dest='logDir',
                         default=None,
                         help="specify log directory")
@@ -83,16 +80,16 @@ def parseCmdLine(args) -> Namespace :
 
 
 
-    parser.add_argument("-b,--mqtt-broker",
+    parser.add_argument("-b","--mqtt-broker",
                         dest='mqttBroker',
                         default="104.53.51.51",
                         help="MQTT Broker URL")
-    parser.add_argument("-u,--user",
+    parser.add_argument("-u","--user",
                         dest="userName",
                         default="delta",
                         help="MQTT User Name")
 
-    parser.add_argument("-p,--password",
+    parser.add_argument("-p","--password",
                         dest="password",
                         default="KeepClimbing!",
                         help="MQTT Password")
