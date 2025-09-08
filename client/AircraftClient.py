@@ -13,17 +13,15 @@ import logging
 logger = logging.getLogger("AircraftClient")
 
 class AircraftClient(object) :
-    def __init__(self,acId:str,mqttClient:MqttClient,msi="https://msi.viasat.com:9100/v1/flight") :
+    def __init__(self,mqttClient:MqttClient,msi="https://msi.viasat.com:9100/v1/flight") :
         super().__init__()
         self.mqttClient = mqttClient
         self.msiUrl = msi
-        self.acId = acId
-        self.topic = f"Delta/{self.acId}/Viasat"
         self.api = ViasatMSI(msi)
 
 
     def publish(self,msiData) :
-        header = {"tailNum" : self.acId,
+        header = {"tailNum"   : msiData['vehicleId'],
                   "flightNum" : msiData["flightNumber"],
                   "timestamp" : msiData["timestamp"],
                   "flightID"  : msiData["flightId"]}
@@ -34,12 +32,12 @@ class AircraftClient(object) :
                    }
 
         payloadStr = json.dumps(payload)
-        topic = msiData['vehicleId']
+        topic = f"Delta/{msiData['vehicleId']}/Viasat"
         del msiData['vehicleId']
 
 
         logger.info(f"Publishing to {topic}: {payloadStr}")
-        self.mqttClient.publish(self.topic,payloadStr)
+        self.mqttClient.publish(topic,payloadStr)
 
 
 
@@ -68,10 +66,6 @@ def parseCmdLine(args) -> Namespace :
                         default=None,
                         help="specify log directory")
 
-    parser.add_argument("-A,--aircraft",
-                        dest="acID",
-                        default="N304DL",
-                        help="specify Aircraft ID")
 
     parser.add_argument("-M,--msi",
                         dest="msiEndpoint",
@@ -117,18 +111,18 @@ if __name__ == "__main__" :
     logger.info("Starting Aircraft Client")
     logger.info(f"Broker: {params.mqttBroker}, User: {params.userName}")
 
-    clientId = f"{params.acID}-{random.randint(1_000,10_000)}"
+    clientId = f"AcClient-{random.randint(1_000,10_000)}"
 
     mqtt = MqttClient(params.mqttBroker,user=params.userName,passwd=params.password,clientID=clientId)
 
-    svc = AircraftClient(acId=params.acID,mqttClient=mqtt,msi=params.msiEndpoint)
+    svc = AircraftClient(mqttClient=mqtt,msi=params.msiEndpoint)
 
     try:
         svc.run()
     except KeyboardInterrupt:
+        pass
+    finally:
         svc.terminate()
-
-
-    mqtt.terminate()
+        mqtt.terminate()
 
     print("Exiting...")

@@ -18,7 +18,8 @@ ARG MQTT_URL
 ARG MQTT_USER
 ARG MQTT_PASSWORD
 
-LABEL authors="Brian Still"
+LABEL Author="Brian Still"
+LABEL Description="ViaSat MSI API Collector to MQTT broker"
 
 RUN pip install --upgrade pip
 RUN pip install python-dateutil \
@@ -46,7 +47,7 @@ RUN pip install requests \
 
 
 # Copy in the client source code
-COPY ./client  ${APP_DIR}/client/
+COPY ./client/*.py  ${APP_DIR}/client/
 
 # Copy in the common code
 RUN mkdir ${APP_DIR}/common
@@ -65,5 +66,5 @@ ENV PYTHONPATH="${APP_DIR}"
 CMD "python3" "${APP_DIR}/client/AircraftClient.py"  \
               "-b" "${MQTT_URL}" \
               "-L" "${LOG_DIR}"  \
-              "--user" "${MQTT_USER}" \
-              "--password" "${MQTT_PASSWORD}"
+              "-u" "${MQTT_USER}" \
+              "-p" "${MQTT_PASSWORD}"
