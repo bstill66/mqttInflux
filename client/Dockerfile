@@ -10,7 +10,7 @@ ARG APP_DIR="${ROOT}app"
 ARG LOG_DIR="${ROOT}logs"
 ARG APP_USER="client"
 
-FROM python:3.12-alpine AS BASE
+FROM python:3.12-alpine AS base
 ARG APP_USER
 ARG APP_DIR
 ARG LOG_DIR

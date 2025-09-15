@@ -1,4 +1,5 @@
-import logging
+
+import os
 import random
 import re
 import sys
@@ -10,7 +11,7 @@ from paho.mqtt.enums import CallbackAPIVersion
 
 import logging
 
-logger = logging.getLogger("MqttClient")
+logger = logging.getLogger("")
 
 class MqttClient(object) :
     FIRST_RECONNECT_DELAY = 1
@@ -32,6 +33,7 @@ class MqttClient(object) :
 
         if (user is not None) :
             self.mqClient.username_pw_set(user,passwd)
+            logger.info(f"Connecting to {self.server} as {user}")
 
         # setup the callbacks
         self.mqClient.on_connect    = self._onConnect
@@ -46,7 +48,7 @@ class MqttClient(object) :
         self.topics = {}
 
     def onConnect(self,client:Client,flags,rc,prop) :
-        logging.info("Connected with result code "+str(rc))
+        logger.info("Connected with result code "+str(rc))
 
     @staticmethod
     def _onConnect(client, ud, flags, rc, prop) :
@@ -59,6 +61,7 @@ class MqttClient(object) :
 
     @staticmethod
     def _onDisconnect(client, ud, flags, rc, p):
+        logger.info(f"Disconnecting from {ud.server}")
         if hasattr(ud, 'onDisconnect') :
             ud.onDisconnect(client,flags,rc,p)
 
@@ -66,26 +69,26 @@ class MqttClient(object) :
         if self.abort:
             return
 
-        logging.info("Disconnected with result code: %s", rc)
+        logger.info("Disconnected with result code: %s", rc)
 
         reconnect_count = 0
         reconnect_delay = 0
         while reconnect_count < self.MAX_RECONNECT_COUNT:
-            logging.info("Reconnecting in %d seconds...", reconnect_delay)
+            logger.info("Reconnecting in %d seconds...", reconnect_delay)
             sleep(reconnect_delay)
 
             try:
                 client.reconnect()
-                logging.info("Reconnected successfully!")
+                logger.info("Reconnected successfully!")
                 return
             except Exception as err:
-                logging.error("%s. Reconnect failed. Retrying...", err)
+                logger.error("%s. Reconnect failed. Retrying...", err)
 
             reconnect_delay *= self.RECONNECT_RATE
             reconnect_delay = min(reconnect_delay, self.MAX_RECONNECT_DELAY)
             reconnect_count += 1
 
-        logging.info("Reconnect failed after %s attempts. Exiting...", reconnect_count)
+        logger.info("Reconnect failed after %s attempts. Exiting...", reconnect_count)
 
 
     @staticmethod
@@ -95,7 +98,7 @@ class MqttClient(object) :
 
     def onMessage(self,client:Client,msg) :
         self.subRxCount += 1
-        logging.info(f"Message received: " + str(msg.payload))
+        logger.info(f"Message received: " + str(msg.payload))
 
         for k in self.topics:
             pat,usrFunc,usrData = self.topics[k]
@@ -108,7 +111,7 @@ class MqttClient(object) :
 
     def doConnect(self,srvr:str,port:int) -> bool :
         if self.mqClient.connect(self.server, self.port, 60) != 0:
-            logging.warning("Couldn't connect to the mqtt broker")
+            logger.warning("Couldn't connect to the mqtt broker")
             return False
         return True
 
@@ -164,8 +167,8 @@ class MqttClient(object) :
 
 if __name__ == "__main__" :
     SERVER = "104.53.51.51"
-    USER   = "delta"
-    PWD    = "KeepClimbing!"
+    USER   = os.getenv("MQTT_USER")
+    PWD    = os.getenv("MQTT_PASSWORD")
 
     if len(sys.argv) > 1:
         SERVER = sys.argv[1]
@@ -175,6 +178,7 @@ if __name__ == "__main__" :
                      clientID=f"sub-{random.uniform(10_000,100_000)}")
 
     sub.run()
+
 
     count1 = 0
     count2 = 0

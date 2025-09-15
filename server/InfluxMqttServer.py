@@ -13,7 +13,6 @@ from influxdb_client.rest import ApiException
 from paho.mqtt.client import MQTTMessage
 
 
-
 from common.MqttClient import MqttClient
 from InfluxClient import InfluxClient
 
@@ -23,8 +22,7 @@ from InfluxClient import InfluxClient
 
 #MQTT_SERVER = "192.168.1.200"
 #MQTT_SERVER = "104.53.51.51"
-#MQTT_USER   = "delta"
-#MQTT_PWD    = "KeepClimbing!"
+
 
 #INFLUX_SERVER = "http://192.168.1.200:8086"
 #INFLUX_SERVER = "http://104.53.51.51:8086"
@@ -53,7 +51,7 @@ class InfluxMqttServer (object) :
         self.dbase.createBucket("Aircraft")
         logger.info(f"Successfully created bucket")
 
-        topic = "Delta/+/Viasat"
+        topic = "Delta/+/+/MSI"
         self.mqttClient.subscribe(topic,lambda m,u: u.process(m),self)
         logger.info(f"Subscribed to: '{topic}'")
 
@@ -76,10 +74,10 @@ class InfluxMqttServer (object) :
 
         try:
             tmp = Point(tpc[1])
-            if len(tpc) > 2:
-                tmp.tag("Source",tpc[2])
-            tmp.tag("regNum",data['aircraft']['tailNum'])
-            tmp.tag("fltNum",data['aircraft']['flightNum'])
+            if len(tpc) >= 3 :
+                tmp.tag("Source",tpc[3])
+                tmp.tag("regNum",tpc[1])
+                tmp.tag("fltNum",tpc[2])
 
             for k in data['data'].keys():
                 tmp.field(k,data['data'][k])
@@ -214,7 +212,7 @@ if __name__ == "__main__" :
             if params.testMode:
                 logger.info(f"Generating Test message")
                 msg = genTestMsg()
-                pub.publish("Delta/N304DL/Viasat",msg)
+                pub.publish("Delta/NXXXDL/DLZZZ/MSI",msg)
             sleep(5)
 
     except ApiException as e :

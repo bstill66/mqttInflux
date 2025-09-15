@@ -10,7 +10,7 @@ from ViasatMSI import ViasatMSI
 from common.MqttClient import MqttClient
 
 import logging
-logger = logging.getLogger("AircraftClient")
+logger = logging.getLogger()
 
 class AircraftClient(object) :
     def __init__(self,mqttClient:MqttClient,msi="https://msi.viasat.com:9100/v1/flight") :
@@ -21,19 +21,26 @@ class AircraftClient(object) :
 
 
     def publish(self,msiData) :
-        header = {"tailNum"   : msiData['vehicleId'],
-                  "flightNum" : msiData["flightNumber"],
-                  "timestamp" : msiData["timestamp"],
-                  "flightID"  : msiData["flightId"]}
+        header = {"timestamp": str(datetime.now(timezone.utc))}
 
-        payload = {"aircraft" : header,
-                   "timestamp": str(datetime.now(timezone.utc)),
-                   "data" : msiData
+        # encode the topic for better efficiency
+        topic = f"Delta/{msiData['vehicleId']}/{msiData['flightNumber']}/MSI"
+
+        # remove since encoded in the topic
+        msiData.pop('vehicleId')
+        msiData.pop('flightNumber')
+
+        # Don't send empty data elements
+        dataToSend = {}
+        for k in msiData.keys() :
+            if msiData[k] != None :
+                dataToSend[k] = msiData[k]
+
+        payload = {"header" : header,
+                   "data" : dataToSend
                    }
 
         payloadStr = json.dumps(payload)
-        topic = f"Delta/{msiData['vehicleId']}/Viasat"
-        del msiData['vehicleId']
 
 
         logger.info(f"Publishing to {topic}: {payloadStr}")
@@ -73,19 +80,18 @@ def parseCmdLine(args) -> Namespace :
                         help="ViaSat MSI Endpoint")
 
 
-
     parser.add_argument("-b","--mqtt-broker",
                         dest='mqttBroker',
                         default="104.53.51.51",
                         help="MQTT Broker URL")
     parser.add_argument("-u","--user",
                         dest="userName",
-                        default="delta",
+                        default=os.getenv("MQTT_USER"),
                         help="MQTT User Name")
 
     parser.add_argument("-p","--password",
                         dest="password",
-                        default="KeepClimbing!",
+                        default=os.getenv("MQTT_PASSWORD"),
                         help="MQTT Password")
 
     return parser.parse_args(args)
@@ -104,9 +110,12 @@ if __name__ == "__main__" :
 
     if params.logDir is not None:
         logfile = os.path.join(params.logDir,datetime.now().strftime("AcClient_%Y%m%d_%H%M%S.log"))
-        logging.basicConfig(filename=logfile, encoding='utf-8', level=level)
-    else:
-        logging.basicConfig(level=level)
+        try:
+            logging.basicConfig(filename=logfile, encoding='utf-8', level=level)
+        except PermissionError as pe:
+            print("Unable to create log file...logging disabled to file")
+
+    logging.basicConfig(level=level)
 
     logger.info("Starting Aircraft Client")
     logger.info(f"Broker: {params.mqttBroker}, User: {params.userName}")
