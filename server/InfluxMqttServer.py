@@ -82,7 +82,7 @@ class InfluxMqttServer (object) :
             for k in data['data'].keys():
                 tmp.field(k,data['data'][k])
 
-            ts = data['aircraft']['timestamp']
+            ts = data['header']['timestamp']
             tmp = tmp.time(ts,write_precision=WritePrecision.S)
             p = tmp
             logger.info(f"Successfully converted to Influx Point")
