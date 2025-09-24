@@ -2,6 +2,7 @@
 ARG MQTT_URL="104.53.51.51"
 ARG MQTT_USER
 ARG MQTT_PASSWORD
+ARG MSI_HOST="https://msi.viasat.com:9100/v1/flight"
 
 
 # Directories used by application
