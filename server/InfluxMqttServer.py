@@ -11,7 +11,7 @@ from time import sleep
 from influxdb_client import Point, WritePrecision
 from influxdb_client.rest import ApiException
 from paho.mqtt.client import MQTTMessage
-
+from urllib3.exceptions import NewConnectionError
 
 from common.MqttClient import MqttClient
 from InfluxClient import InfluxClient
@@ -31,7 +31,6 @@ INFLUX_APIKEY = "kwSpQ_8q-6cwAHgquFLhp6URqaq7134ROpHEUHMDLulH49GmU1OKdS2vXb0vB7V
 
 import logging
 logger = logging.getLogger("InfluxMqttServer")
-
 
 
 
@@ -121,6 +120,7 @@ def parseCmdLine(args) -> Namespace :
 
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="specify output verbosity")
+
     parser.add_argument("-L,--logdir",
                         dest='logDir',
                         default="/mnt/data",
@@ -147,12 +147,11 @@ def parseCmdLine(args) -> Namespace :
                        default="Aircraft",
                        help="InfluxDB Bucket")
 
-
-
     parser.add_argument("-b,--mqtt-broker",
                         dest='mqttBroker',
                         default="localhost",
                         help="MQTT Broker URL")
+
     parser.add_argument("-u","--user",
                         dest="user",
                         default="delta",
@@ -171,12 +170,13 @@ if __name__ == "__main__" :
     params = parseCmdLine(sys.argv[1:])
     try:
         level = getattr(logging, params.logLevel.upper())
+        logfile = os.path.join(params.logDir, datetime.now().strftime("InfluxMqtt_%Y%m%d_%H%M%S.log"))
+        logging.basicConfig(filename=logfile, encoding='utf-8', level=level)
     except AttributeError as ae:
         level = logging.INFO
 
+    logging.basicConfig(level=level)
 
-    logfile = os.path.join(params.logDir,datetime.now().strftime("InfluxMqtt_%Y%m%d_%H%M%S.log"))
-    logging.basicConfig(filename=logfile, encoding='utf-8', level=level)
     logger.info("Starting InfluxMqttServer")
 
     db = InfluxClient(params.influxServer,params.bucket,org="Brian Still",token=INFLUX_APIKEY)
@@ -185,12 +185,18 @@ if __name__ == "__main__" :
                       clientID=f"infdb-{random.randint(0,10_000):06d}")
     mqtt.run()
 
-    mqClient = InfluxMqttServer(db, mqtt)
+    try:
+        mqClient = InfluxMqttServer(db, mqtt)
+    except Exception as e:
+        logger.error("Unable to connect to InfluxDB Service")
+        sys.exit(1)
 
     if params.testMode:
         pub = MqttClient(params.mqttBroker,1883,user=params.user,passwd=params.password,
                          clientID=f"test-{random.randint(0,10_000)}")
         pub.run()
+    else:
+        pub = None
 
 
     def genTestMsg() :
@@ -219,8 +225,15 @@ if __name__ == "__main__" :
         logger.exception(e)
     except KeyboardInterrupt as e :
         logger.info("Exiting....cleanup up clients")
+    except NewConnectionError:
+        logger.critical("Unable to connect to InfluxDB Server")
+    except Exception as e :
+        logger.exception(e)
+    finally:
+        logger.info("Terminating InfluxMqttServer")
         mqClient.terminate()
-        pub.terminate()
+        if pub is not None:
+            pub.terminate()
 
 
 

@@ -214,10 +214,11 @@ if __name__ == "__main__" :
     if params.kinesisCfg is not None:
         # Start Kinesis Client
         try:
+            logger.info(f"Reading Kinesis config from: {params.kinesisCfg}")
             aws = KinesisClient(params.kinesisCfg)
             svc.addClient("Aws/Kinesis",svc.publishKinesis,aws)
         except Exception as e:
-            print(f"Unable to create Kinesis Client {e}")
+            logger.error(f"Unable to create Kinesis Client {e}")
 
 
     try:

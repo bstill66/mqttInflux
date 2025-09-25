@@ -3,6 +3,7 @@ import os
 import random
 import re
 import sys
+from multiprocessing import Event
 from time import sleep, time
 from typing import Callable
 
@@ -44,7 +45,7 @@ class MqttClient(object) :
         self.subMsgCount = 0
         self.pubMsgCount = 0
         self.subRxCount  = 0
-        self.abort = False
+        self.abort = Event()
         self.topics = {}
 
     def onConnect(self,client:Client,flags,rc,prop) :
@@ -66,14 +67,14 @@ class MqttClient(object) :
             ud.onDisconnect(client,flags,rc,p)
 
     def onDisconnect(self,client,flags,rc,prop):
-        if self.abort:
+        if self.abort.is_set():
             return
 
         logger.info("Disconnected with result code: %s", rc)
 
         reconnect_count = 0
         reconnect_delay = 0
-        while reconnect_count < self.MAX_RECONNECT_COUNT:
+        while reconnect_count < self.MAX_RECONNECT_COUNT and not self.abort.is_set():
             logger.info("Reconnecting in %d seconds...", reconnect_delay)
             sleep(reconnect_delay)
 
@@ -146,7 +147,7 @@ class MqttClient(object) :
         self.initialize()
 
         connected = False
-        while not self.abort and not connected :
+        while not self.abort.is_set() and not connected :
             sleep(self.FIRST_RECONNECT_DELAY)
             try:
                 connected = self.doConnect(self.server,self.port)
@@ -156,9 +157,12 @@ class MqttClient(object) :
         self.mqClient.loop_start()
 
 
+
     def terminate(self):
-        self.abort = True
+        self.abort.set()
         self.mqClient.disconnect()
+        self.mqClient.loop_stop()
+        logger.info("MQTT Client terminated successfully")
 
 
 
