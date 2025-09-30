@@ -1,8 +1,14 @@
 import re
+from random import randint
 
 
 def onOff(v:str) -> str:
-    return "Ground" if v == "On" else "Air"
+    return (v == "On")
+
+def paState(v:str) -> str:
+    if v is None:
+        return "Unknown"
+    return v
 
 FLTNUM_RE = re.compile("(?P<CC>\\D+)(?P<NUM>\\d+)")
 def fltNum(fn:str) -> int :
@@ -11,19 +17,29 @@ def fltNum(fn:str) -> int :
         return int(m.group("NUM"))
     return None
 
+def eta(fn:str) :
+    if fn is None:
+        # can't send a None...so send bogus time
+        return "1999-12-31T23:59:59"
+    else:
+        return fn
+
+def toDate(fn:str) -> str:
+    return fn[0:10]
 
 KAFKA_XFORM = {
-    "flightId": (None,None,None),
+    "flightId": (None,"TBD",None),
     "timestamp" : (None,None,None),
-    "flightOriginDate": (None,None,None),
-    "estimatedArrivalTime": (None,None,None),
-    "elapsedFlightTimeMinutes": (None,None,None),
+    #"viasat_flight_id" : ("flightId",None,None),
+    "flightOriginDate": ("timestamp",None,toDate),
+    "estimatedArrivalTime": ("eta",None,eta),
+    "elapsedFlightTimeMinutes": (None,randint(5,75),None),
     "operatingCarrierCode":(None,"DL",None),
     "flightNumber": (None,None,fltNum),
     "latitude": (None,None,None),
     "longitude":(None,None,None),
     "ship":("noseId",None,None),
-    "paState":(None,None,None),
+    "paState":(None,None,paState),
     "registrationNumber":(None,None,None),
     "destinationCode":("destination",None,None),
     "originCode":("origin",None,None),
@@ -31,11 +47,11 @@ KAFKA_XFORM = {
     "currentAirTempuratureCelsius":(None,None,None),
     "altitudeFeet":("altitude",None,None),
     "nauticalMilesRemaining":None,
-    "doorState":None,
+    #"doorState":None,
     "currentGroundSpeedKts":("groundspeed",None,None),
     "currentHeading":None,
     "flightTimeRemainingMinutes":None,
-    "wheelsOnGround":("wheelWeightState",None,lambda x: onOff(x)),
+    "wheelsOnGround":("wheelWeightState",None,onOff),
     "aircraftGrossWeight":None
 }
 

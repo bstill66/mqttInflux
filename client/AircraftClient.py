@@ -82,7 +82,7 @@ class AircraftClient(object) :
         payloadStr = json.dumps(payload)
 
 
-        logger.info(f"Publishing to {topic}: {payloadStr}")
+        logger.info(f"Publishing to {topic}, timestamp: {msiData['timestamp']}")
         mqtt.publish(topic,payloadStr)
 
 
@@ -97,7 +97,7 @@ class AircraftClient(object) :
             try:
                 data = msgQ.get(timeout=3)
                 if data is not None:
-                    logger.info(f"Client {name} publishing {data}")
+                    logger.info(f"Client {name} publishing {data['timestamp']}")
                     publish(data,client)
                 else:
                     pass
@@ -116,7 +116,7 @@ class AircraftClient(object) :
             sleep(3)
             data = self.api.query()
             if (data is not None) :
-                logger.info(f"Received message from MSI {data}")
+                logger.info(f"Received message from MSI {data['timestamp']}")
 
                 # publish to all clients
                 for k in self.clients:
@@ -227,7 +227,7 @@ if __name__ == "__main__" :
 
 
     try:
-        mqtt.run()
+        #mqtt.run()
         svc.run()
     except KeyboardInterrupt:
         pass
