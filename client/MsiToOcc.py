@@ -1,7 +1,15 @@
+import re
+
+
 def onOff(v:str) -> str:
     return "Ground" if v == "On" else "Air"
 
-
+FLTNUM_RE = re.compile("(?P<CC>\\D+)(?P<NUM>\\d+)")
+def fltNum(fn:str) -> int :
+    m = FLTNUM_RE.match(fn)
+    if m is not None:
+        return int(m.group("NUM"))
+    return None
 
 
 KAFKA_XFORM = {
@@ -11,7 +19,7 @@ KAFKA_XFORM = {
     "estimatedArrivalTime": (None,None,None),
     "elapsedFlightTimeMinutes": (None,None,None),
     "operatingCarrierCode":(None,"DL",None),
-    "flightNumber": (None,None,None),
+    "flightNumber": (None,None,fltNum),
     "latitude": (None,None,None),
     "longitude":(None,None,None),
     "ship":("noseId",None,None),

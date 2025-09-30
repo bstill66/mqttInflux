@@ -20,6 +20,7 @@ ARG MQTT_URL
 ARG MQTT_USER
 ARG MQTT_PASSWORD
 ARG CFG_DIR
+ARG MSI_HOST
 
 LABEL Author="Brian Still"
 LABEL Description="ViaSat MSI API Collector to MQTT broker"
@@ -67,6 +68,7 @@ ENV MQTT_URL=${MQTT_URL}
 ENV APP_DIR=${APP_DIR}
 ENV LOG_DIR=${LOG_DIR}
 ENV CFG_DIR=${CFG_DIR}
+ENV MSI_HOST=${MSI_HOST}
 
 ENV PYTHONPATH="${APP_DIR}"
 CMD "python3" "${APP_DIR}/client/AircraftClient.py"  \
@@ -74,4 +76,5 @@ CMD "python3" "${APP_DIR}/client/AircraftClient.py"  \
               "-L" "${LOG_DIR}"  \
               "-u" "${MQTT_USER}" \
               "-p" "${MQTT_PASSWORD}" \
+              "-M" "${MSI_HOST}" \
               "-K" "${CFG_DIR}/DalKinesis.cfg"

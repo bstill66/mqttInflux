@@ -23,6 +23,8 @@ class AircraftClient(object) :
         super().__init__()
 
         self.msiUrl = msi
+        logger.info(f"Retrieving MSI data from {msi}")
+
         self.api = ViasatMSI(msi)
         self.startFlag = Event()
         self.clients = {}
@@ -44,9 +46,12 @@ class AircraftClient(object) :
         try:
             kdata = json.dumps(transform(msiData))
             rsp = aws.publish(None,kdata)
-            logger.debug(f"published {kdata} to Kinesis")
+            if rsp is not None:
+                logger.info(f"Published to Kinesis: [{rsp['ResponseMetadata']['HTTPStatusCode']}] : {rsp['SequenceNumber']}")
+        except KeyError as ke:
+            logger.error(f"Key error {ke}")
         except Exception as e:
-            logger.exception(e)
+            logger.error(f"Exception publishing to Kinesis {rsp}")
 
 
 

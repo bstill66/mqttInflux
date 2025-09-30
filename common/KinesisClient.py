@@ -36,9 +36,11 @@ class KinesisClient(Client) :
         if stream is None:
             stream = self.config['default_stream']
         try:
+            logger.debug("putting record to kinesis")
             rsp = self.client.put_record(StreamName=stream,
                                          Data=json.dumps(data),
                                          PartitionKey="parition-1")
+            logger.debug("finished putting record to kinesis")
             return rsp
         except Exception as e:
             logger.exception(e)
