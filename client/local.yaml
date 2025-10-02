@@ -1,0 +1,17 @@
+services:
+    client:
+      image: acmsi:kinesis
+      environment:
+        MQTT_HOST: "192.168.1.200"
+        MQTT_PORT: "1883"
+        MQTT_USER: "delta"
+        MQTT_PASSWORD:  "KeepClimbing!"
+      networks:
+        - outside
+      volumes:
+        - /home/bstill/logs:/logs
+        - /home/bstill/mqttInflux/config:/config
+
+networks:
+  outside:
+    external: true

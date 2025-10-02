@@ -11,7 +11,7 @@ from time import sleep
 from typing import Callable
 
 from ViasatMSI import ViasatMSI
-from client.MsiToOcc import transform
+from common.MsiToOcc import transform
 from common.KinesisClient import KinesisClient
 from common.MqttClient import MqttClient
 
@@ -227,7 +227,7 @@ if __name__ == "__main__" :
 
 
     try:
-        #mqtt.run()
+        mqtt.run()
         svc.run()
     except KeyboardInterrupt:
         pass

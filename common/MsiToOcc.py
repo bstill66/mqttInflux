@@ -5,10 +5,34 @@ from random import randint
 def onOff(v:str) -> str:
     return (v == "On")
 
+def gndAir(v:bool) -> str:
+    if v:
+        return "Ground"
+    else:
+        return "Air"
+
+
 def paState(v:str) -> str:
     if v is None:
         return "Unknown"
+
+    if v:
+        return "Active"
+    else:
+        return "Inactive"
+
+def to360(v:str) -> int:
+    if v is None: return None
+    if isinstance(v,str):
+        v = int(v)
+
+    if v < 0:
+        v += 360
+
     return v
+
+
+
 
 FLTNUM_RE = re.compile("(?P<CC>\\D+)(?P<NUM>\\d+)")
 def fltNum(fn:str) -> int :

@@ -148,10 +148,10 @@ class MqttClient(object) :
 
         connected = False
         while not self.abort.is_set() and not connected :
-            sleep(self.FIRST_RECONNECT_DELAY)
             try:
                 connected = self.doConnect(self.server,self.port)
             except OSError as err:
+                sleep(self.FIRST_RECONNECT_DELAY)
                 connected = False
 
         self.mqClient.loop_start()

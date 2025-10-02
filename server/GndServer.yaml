@@ -1,0 +1,19 @@
+services:
+    broker:
+      image: pao_mqtt
+      ports:
+        - "1883:1883"
+    server:
+      build: ./Dockerfile
+      environment:
+        MQTT_HOST: "localhost"
+        MQTT_PORT: "1883"
+        MQTT_USER: "delta"
+        MQTT_PASSWORD:  "KeepClimbing!"
+      volumes:
+        - logdir:/logs
+
+
+volumes:
+    logdir:
+

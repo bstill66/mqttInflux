@@ -59,6 +59,7 @@ RUN mkdir ${APP_DIR}/common
 COPY ./common/MqttClient.py     ${APP_DIR}/common/MqttClient.py
 COPY ./common/Client.py         ${APP_DIR}/common/Client.py
 COPY ./common/KinesisClient.py  ${APP_DIR}/common/KinesisClient.py
+COPY ./common/MsiToOcc.py       ${APP_DIR}/common/MsiToOcc.py
 
 USER ${APP_USER}
 
