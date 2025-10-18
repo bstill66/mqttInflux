@@ -16,7 +16,7 @@ class ViasatMSI(object) :
     def query(self) -> dict:
 
         try:
-            if True:
+            if False:
 
                     rsp = requests.get(self.url,timeout=2.5,
                                        headers={'Accept': 'application/json'})
@@ -29,6 +29,7 @@ class ViasatMSI(object) :
                 "airspeed" : 410.0,
                 "altitude": 33000.0,
                 "groundspeed": 420.0,
+                "eta" : "02:30",
                 "heading": 180.0,
                 "latitude": 30.4469485748939,
                 "longitude": -99.234234

@@ -5,20 +5,23 @@ import random
 import sys
 from argparse import Namespace, ArgumentParser
 from datetime import datetime
+from multiprocessing import Queue, Event
+from queue import Empty
+from threading import Thread
 
 from time import sleep
+from typing import Callable
 
 from influxdb_client import Point, WritePrecision
 from influxdb_client.rest import ApiException
 from paho.mqtt.client import MQTTMessage
 from urllib3.exceptions import NewConnectionError
 
+from common.KinesisClient import KinesisClient
 from common.MqttClient import MqttClient
 from InfluxClient import InfluxClient
-
-
-
-
+from common.MsiToOcc import transform
+from server.TestFileGen import TestFileGen
 
 #MQTT_SERVER = "192.168.1.200"
 #MQTT_SERVER = "104.53.51.51"
@@ -41,18 +44,72 @@ class InfluxMqttServer (object) :
     MAX_RECONNECT_COUNT = 12
     MAX_RECONNECT_DELAY = 60
 
-    def __init__ (self,db:InfluxClient,sub:MqttClient):
-        self.dbase = db
+    def __init__ (self,sub:MqttClient):
+
         self.mqttClient = sub
+        self.clients = {}
+        self.startFlag = Event()
 
     def init(self) :
 
-        self.dbase.createBucket("Aircraft")
-        logger.info(f"Successfully created bucket")
+        #self.dbase.createBucket("Aircraft")
+
+        #logger.info(f"Successfully created bucket")
+
+        #self.addClient("Influx",self.writeToInflux,self.dbase)
+
+        self.mqttClient.run()
 
         topic = "Delta/+/+/MSI"
         self.mqttClient.subscribe(topic,lambda m,u: u.process(m),self)
         logger.info(f"Subscribed to: '{topic}'")
+
+        self.startFlag.set()
+
+    def writeToInflux(self,topic:str,payload:dict,db) :
+        pt, ts = self.cvtToPoint(topic, payload)
+        if (pt is not None):
+            db.write(ts, pt)
+            logger.info(f"Wrote Point to InfluxDB")
+
+    def writeToKinesis(self,topic:str,payload:dict,client) :
+        logger.info("Writing to Kinesis")
+        toSend  = transform(payload['data'])
+        rsp = client.publish(None,toSend)
+        logger.info(f"Published Point to Kinesis {rsp['ResponseMetadata']['HTTPStatusCode']}: {rsp['SequenceNumber']}")
+
+    def addClient(self,name:str,func:Callable,client) :
+        q = Queue()
+        evt = Event()
+        evt.set()
+
+        thr = Thread(target=self.clientRun,args=(name,q,evt,func,client))
+        self.clients[name] = (thr,q,evt,func,client)
+        thr.start()
+
+
+    def clientRun(self,name:str,msgQ:Queue,runFlag:Event,publish:Callable,client) -> None:
+        logger.info(f"Client {name} waiting to start")
+        self.startFlag.wait()
+        logger.info(f"Client {name} started on {msgQ} {runFlag}")
+
+        while runFlag.is_set() :
+            try:
+                data = msgQ.get(timeout=3)
+                if data is not None:
+                    topic,payload = data
+                    logger.info(f"Client {name} publishing {payload['header']['timestamp']}")
+                    publish(topic,payload,client)
+                else:
+                    pass
+            except Empty:
+                pass
+            except Exception as e:
+                logger.exception(e)
+                pass
+
+        logger.info(f"Client {name} exiting")
+        client.terminate()
 
     def parse(self,m:MQTTMessage) :
         asJson = None
@@ -81,7 +138,7 @@ class InfluxMqttServer (object) :
             for k in data['data'].keys():
                 tmp.field(k,data['data'][k])
 
-            ts = data['header']['timestamp']
+            ts = data['data']['timestamp']
             tmp = tmp.time(ts,write_precision=WritePrecision.S)
             p = tmp
             logger.info(f"Successfully converted to Influx Point")
@@ -94,11 +151,20 @@ class InfluxMqttServer (object) :
         payload = self.parse(m)
 
         if (payload is not None) :
-            print(payload)
-            pt,ts = self.cvtToPoint(m.topic,payload)
-            if (pt is not None) :
-                self.dbase.write(ts,pt)
-                logger.info(f"Wrote Point to InfluxDB")
+            logger.info(payload)
+
+            for c in self.clients.keys() :
+                tpl = self.clients[c]
+                msgQ = tpl[1]
+                if msgQ is not None :
+                    logger.info(f"Putting to {msgQ}")
+                    msgQ.put((m.topic,payload))
+
+            if False:
+                pt,ts = self.cvtToPoint(m.topic,payload)
+                if (pt is not None) :
+                    self.dbase.write(ts,pt)
+                    logger.info(f"Wrote Point to InfluxDB")
 
 
 
@@ -112,6 +178,13 @@ class InfluxMqttServer (object) :
     def terminate(self) :
         logger.info(f"Terminating MQTT Client/Listener")
         self.mqttClient.terminate()
+        for c in self.clients:
+            thr,q,evt,f,cli = self.clients[c]
+            evt.clear()
+            q.put(None)
+            logger.debug(f"Waiting for {thr} to complete")
+            thr.join()
+
 
 
 def parseCmdLine(args) -> Namespace :
@@ -128,13 +201,13 @@ def parseCmdLine(args) -> Namespace :
 
     parser.add_argument("-l,--log",
                         dest='logLevel',
-                        default=logging.INFO,
+                        default="INFO",
                         help="specify log level")
 
     parser.add_argument("-T,--test",
                         dest='testMode',
-                        default=False,
-                        action="store_true",
+                        default=None,
+                        nargs=1,
                         help="Enable Test Mode")
 
     parser.add_argument("-i,--influx-server",
@@ -161,6 +234,10 @@ def parseCmdLine(args) -> Namespace :
                         dest="password",
                         default="KeepClimbing!",
                         help="MQTT Password")
+    parser.add_argument("-K",
+                        dest="kinesisConfig",
+                        default=None,
+                        help="Kinesis Config")
 
     return parser.parse_args(args)
 
@@ -169,57 +246,70 @@ if __name__ == "__main__" :
 
     params = parseCmdLine(sys.argv[1:])
     try:
-        level = getattr(logging, params.logLevel.upper())
+        if isinstance(params.logLevel,str) :
+            level = getattr(logging, params.logLevel.upper())
+        elif isinstance(params.logLevel,int) :
+            level = params.logLevel
+        else:
+            level = logging.INFO
+
         logfile = os.path.join(params.logDir, datetime.now().strftime("InfluxMqtt_%Y%m%d_%H%M%S.log"))
         logging.basicConfig(filename=logfile, encoding='utf-8', level=level)
+        print(f"Logging to {logfile}")
     except AttributeError as ae:
         level = logging.INFO
+    except (FileNotFoundError,PermissionError) as e:
+        pass
 
     logging.basicConfig(level=level)
 
     logger.info("Starting InfluxMqttServer")
 
-    db = InfluxClient(params.influxServer,params.bucket,org="Brian Still",token=INFLUX_APIKEY)
-
-    mqtt = MqttClient(params.mqttBroker,1883,user=params.user,passwd=params.password,
-                      clientID=f"infdb-{random.randint(0,10_000):06d}")
-    mqtt.run()
-
     try:
-        mqClient = InfluxMqttServer(db, mqtt)
+        mqtt = MqttClient(params.mqttBroker,1883,user=params.user,passwd=params.password,
+                          clientID=f"infdb-{random.randint(0,10_000):06d}")
+
+        server = InfluxMqttServer(mqtt)
+
+        influxWriter = InfluxClient(params.influxServer, params.bucket, org="Brian Still", token=INFLUX_APIKEY)
+        influxWriter.createBucket(params.bucket)
+        logger.info(f"Successfully created bucket")
+        server.addClient("InfluxWriter", server.writeToInflux, influxWriter)
+
+
+        if params.kinesisConfig is not None:
+            kclient = KinesisClient(params.kinesisConfig)
+            server.addClient("Kinesis", server.writeToKinesis, kclient)
+
     except Exception as e:
-        logger.error("Unable to connect to InfluxDB Service")
+        logger.error(f"Unable to connect to InfluxDB Service:{e}")
         sys.exit(1)
 
     if params.testMode:
+
         pub = MqttClient(params.mqttBroker,1883,user=params.user,passwd=params.password,
                          clientID=f"test-{random.randint(0,10_000)}")
-        pub.run()
+        testgen = TestFileGen(pub,params.testMode)
     else:
         pub = None
-
-
-    def genTestMsg() :
-        data = {"alt": random.uniform(-100, 40_000) ,
-                "lat": random.uniform(-90, 90),
-                "lon": random.uniform(-180, 180) }
-
-
-        data = {"aircraft": {"tailNum": "TEST", "flightNum": "###", "timestamp": "2025-08-30T14:28:09+00:00"}, "timestamp": "2025-08-30 10:28:09.281861", "data": {"latitude": 30.4469485748939, "longitude": -99.234234, "altitude": 1715.0, "groundSpd": 413.0, "heading": 13.0, "airspeed": 410.0}}
-        msg = json.dumps(data)
-
-        return msg
+        testgen = None
 
 
     try:
-        mqClient.run()
+        server.run()
 
-        while True:
-            if params.testMode:
-                logger.info(f"Generating Test message")
-                msg = genTestMsg()
-                pub.publish("Delta/NXXXDL/DLZZZ/MSI",msg)
-            sleep(5)
+
+        if testgen is not None:
+            testgen.run()
+            #for i in range(0,10) :
+            #if params.testMode:
+            #    logger.info(f"Generating Test message")
+            #    msg = genTestMsg()
+            #    pub.publish("Delta/NXXXDL/DLZZZ/MSI",msg)
+        else:
+            while True:
+                sleep(60)
+
 
     except ApiException as e :
         logger.exception(e)
@@ -231,9 +321,15 @@ if __name__ == "__main__" :
         logger.exception(e)
     finally:
         logger.info("Terminating InfluxMqttServer")
-        mqClient.terminate()
+
         if pub is not None:
             pub.terminate()
+
+        server.terminate()
+
+    logger.info("Process Terminated successfully")
+    sys.exit(0)
+
 
 
 

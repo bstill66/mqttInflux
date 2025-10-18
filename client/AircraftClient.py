@@ -83,6 +83,7 @@ class AircraftClient(object) :
 
 
         logger.info(f"Publishing to {topic}, timestamp: {msiData['timestamp']}")
+        logger.info(f"TOPIC:[{topic}] PAYLOAD:[{payloadStr}]")
         mqtt.publish(topic,payloadStr)
 
 

@@ -3,6 +3,7 @@ import logging
 import os
 
 import boto3
+import botocore
 
 from common.Client import Client
 
@@ -31,7 +32,7 @@ class KinesisClient(Client) :
 
 
     def publish(self,stream:str,data) :
-        if isinstance(data,(dict,str)) :
+        if isinstance(data,str) :
             data = json.loads(data)
         if stream is None:
             stream = self.config['default_stream']
@@ -42,15 +43,21 @@ class KinesisClient(Client) :
                                          PartitionKey="parition-1")
             logger.debug("finished putting record to kinesis")
             return rsp
+        except botocore.exceptions.SSLError as e:
+            logger.warning("Problem connecting to Kinesis Server")
         except Exception as e:
             logger.exception(e)
 
         return None
 
+    def terminate(self) :
+        self.client.close()
+
 
 if __name__ == "__main__" :
-
-    pub  = KinesisClient("DalKinesis.cfg")
+    TEST_MSI = """
+    """
+    pub  = KinesisClient("config/DalKinesis.cfg")
 
     rsp = pub.publish("telemetryDataStream",'{"test" : "data"}')
     print(rsp)

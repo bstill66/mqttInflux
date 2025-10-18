@@ -1,15 +1,23 @@
+import logging
 import os
 from datetime import datetime
 
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import ASYNCHRONOUS, WriteOptions
 
+from common.Client import Client
 
-class InfluxClient(object) :
+logger = logging.getLogger()
+
+class InfluxClient(Client):
     def __init__ (self,serverUrl:str,
                   bucket : str,
                   org : str = "",
                   token:str = os.getenv("INFLUXDB_TOKEN")) :
+        super(InfluxClient).__init__()
+
+        self.serverUrl = serverUrl
+        self.bucket = bucket
         self.server = serverUrl
         self.bucket = bucket
         self.org    = org
@@ -23,11 +31,11 @@ class InfluxClient(object) :
 
     def writeSuccess(self,t,d) :
         tmp = d.split(b'\n')
-        print(f"Wrote {len(tmp)} records to {self.server}:{self.bucket}")
+        logger.info(f"Wrote {len(tmp)} records to {self.server}:{self.bucket}")
 
 
     def writeFail(self,x,y,z) :
-        print("Error")
+        logger.error(f"Write failure to InfluxDB: {x},{y},{z}")
 
 
 
@@ -39,9 +47,10 @@ class InfluxClient(object) :
                 bkt = bktApi.create_bucket(bucket_name=name,
                                            description=desc,
                                            org=self.org)
-            self.bucket = name
+                if bkt is not None:
+                    self.bucket = name
 
-            return name is not None
+            return self.bucket is not None
 
 
     def write(self,ts:datetime,data:Point) -> bool :
@@ -55,3 +64,8 @@ class InfluxClient(object) :
                 pass
 
             return False
+
+    def terminate(self) :
+        if self.writeClient is not None :
+            self.writeClient.close()
+        self.client.close()

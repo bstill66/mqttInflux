@@ -34,7 +34,7 @@ class MqttClient(object) :
 
         if (user is not None) :
             self.mqClient.username_pw_set(user,passwd)
-            logger.info(f"Connecting to {self.server} as {user}")
+            logger.info(f"Connecting to MQTT {self.server} as {user}")
 
         # setup the callbacks
         self.mqClient.on_connect    = self._onConnect

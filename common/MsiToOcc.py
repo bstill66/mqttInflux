@@ -1,25 +1,26 @@
 import re
+from datetime import datetime, timedelta, timezone
 from random import randint
 
 
 def onOff(v:str) -> str:
-    return (v == "On")
+    return 1 if (v == "On") else 0
 
 def gndAir(v:bool) -> str:
     if v:
-        return "Ground"
+        return 1
     else:
-        return "Air"
+        return 0
 
 
 def paState(v:str) -> str:
     if v is None:
-        return "Unknown"
+        return None
 
     if v:
-        return "Active"
+        return 1
     else:
-        return "Inactive"
+        return 0
 
 def to360(v:str) -> int:
     if v is None: return None
@@ -41,12 +42,24 @@ def fltNum(fn:str) -> int :
         return int(m.group("NUM"))
     return None
 
+ETA_FMT = re.compile("(?P<HOUR>\\d+)\\:(?P<MINUTE>\\d+)")
 def eta(fn:str) :
-    if fn is None:
-        # can't send a None...so send bogus time
-        return "1999-12-31T23:59:59"
-    else:
-        return fn
+
+    eta = "1999-12-31T23:59:59Z"
+
+    if fn is not None:
+       m = ETA_FMT.match(fn)
+       if m is not None :
+           hour = m.group("HOUR")
+           min  = m.group("MINUTE")
+
+           now = datetime.now(timezone.utc)
+           now += timedelta(hours=int(hour), minutes=int(min))
+
+           eta = now.isoformat(timespec="milliseconds").replace('+00:00', 'Z')
+           eta = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    return eta
 
 def toDate(fn:str) -> str:
     return fn[0:10]

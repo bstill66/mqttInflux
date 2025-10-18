@@ -1,8 +1,8 @@
 # MQTT Parameters
-ARG MQTT_URL="104.53.51.51"
+ARG MQTT_URL="localhost"
 ARG MQTT_USER
 ARG MQTT_PASSWORD
-
+ARG INFLUX_SERVER="http://localhost:8086"
 
 
 # Directories used by application
@@ -20,6 +20,7 @@ ARG MQTT_URL
 ARG MQTT_USER
 ARG MQTT_PASSWORD
 ARG CFG_DIR
+ARG INFLUX_SERVER
 
 LABEL Author="Brian Still"
 LABEL Description="InfluxDB ingest from aircraft"
@@ -67,10 +68,14 @@ ENV MQTT_URL=${MQTT_URL}
 ENV APP_DIR=${APP_DIR}
 ENV LOG_DIR=${LOG_DIR}
 ENV CFG_DIR=${CFG_DIR}
+ENV INFLUX_SERVER=${INFLUX_SERVER}
+
 
 ENV PYTHONPATH="${APP_DIR}"
 CMD "python3" "${APP_DIR}/server/InfluxMqttServer.py"  \
               "-b" "${MQTT_URL}" \
               "-L" "${LOG_DIR}"  \
               "-u" "${MQTT_USER}" \
-              "-p" "${MQTT_PASSWORD}"
+              "-p" "${MQTT_PASSWORD}" \
+              "-i" "${INFLUX_SERVER}" \
+              "-K" "${CFG_DIR}/DalKinesis.cfg"
