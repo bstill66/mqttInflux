@@ -1,9 +1,13 @@
 import json
 import logging
+import random
 import re
+import sys
+from argparse import Namespace, ArgumentParser
 from datetime import datetime, timezone
 from multiprocessing import Event
 from time import sleep
+from venv import __main__
 
 from common.MqttClient import MqttClient
 
@@ -14,7 +18,7 @@ MSI_SAMPLE = '''
 '''
 
 class TestFileGen(object) :
-    SAMPLE_RE = re.compile(".*TOPIC:[(?P<TOPIC>.*)] PAYLOAD:[(?P<PAYLOAD.*)]")
+    SAMPLE_RE = re.compile(r".*:TOPIC:\[(?P<TOPIC>.*)\\]\sPAYLOAD:\[(?P<PAYLOAD>.*)\\].*")
     TOPIC_RE  = re.compile("Delta/(?P<TAIL>[a-zA-z]{1}\\d{3}[a-zA-z]{2})/(?P<FLIGHT>[a-zA-z]{3}\\d+)/MSI")
 
     def __init__(self,client:MqttClient,fnames) :
@@ -60,11 +64,11 @@ class TestFileGen(object) :
                         if m is not None:
                             logger.info(f"{m.group('TOPIC')}:{m.group('PAYLOAD')}")
                             payload = m.group("PAYLOAD")
-                        payload = self.cvtToPublisher(MSI_SAMPLE)
-                        topic   = "Delta/NXXXUS/DAL345/MSI"
-                        sleep(2)
-
-                        self.mqtt.publish(topic,payload)
+                            #payload = self.cvtToPublisher(MSI_SAMPLE)
+                            #topic   = "Delta/NXXXUS/DAL345/MSI"
+                            topic    = m.group("TOPIC")
+                            self.mqtt.publish(topic,payload)
+                            sleep(0.5)
         except FileNotFoundError :
             logger.warning("File {fname} not found")
 
@@ -79,4 +83,51 @@ class TestFileGen(object) :
 
     def waitToComplete(self) :
         self.finished.wait()
+
+def parseCmdLine(args) -> Namespace :
+
+    parser = ArgumentParser("MQTT Server that writes Aircraft data to InfluxDB")
+
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="specify output verbosity")
+
+    parser.add_argument("-T,--topic",
+                        dest='topic',
+                        default=None,
+                        help="Topic override")
+
+
+
+    parser.add_argument("-b,--mqtt-broker",
+                        dest='mqttBroker',
+                        default="localhost",
+                        help="MQTT Broker URL")
+
+    parser.add_argument("-u","--user",
+                        dest="user",
+                        default="delta",
+                        help="MQTT User Name")
+
+    parser.add_argument("-p","--password",
+                        dest="password",
+                        default="KeepClimbing!",
+                        help="MQTT Password")
+
+    parser.add_argument(dest='testFiles',
+                        default=None,
+                        nargs=1,
+                        help="Test files to replicate")
+
+    return parser.parse_args(args)
+
+
+if __name__ == __main__ :
+    params = parseCmdLine(sys.argv[1:])
+
+    pub = MqttClient(params.mqttBroker, 1883, user=params.user, passwd=params.password,
+                     clientID=f"test-{random.randint(0, 10_000)}")
+    pub.run()
+
+    testgen = TestFileGen(pub, params.testFiles,params.topic)
+    testgen.run()
 

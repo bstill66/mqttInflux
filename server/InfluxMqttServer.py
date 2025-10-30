@@ -70,12 +70,13 @@ class InfluxMqttServer (object) :
         pt, ts = self.cvtToPoint(topic, payload)
         if (pt is not None):
             db.write(ts, pt)
-            logger.info(f"Wrote Point to InfluxDB")
+            logger.debug(f"Wrote Point to InfluxDB")
 
     def writeToKinesis(self,topic:str,payload:dict,client) :
-        logger.info("Writing to Kinesis")
+        logger.debug("Writing to Kinesis")
         toSend  = transform(payload['data'])
         rsp = client.publish(None,toSend)
+        logger.debug(f"Kinesis: {toSend}")
         logger.info(f"Published Point to Kinesis {rsp['ResponseMetadata']['HTTPStatusCode']}: {rsp['SequenceNumber']}")
 
     def addClient(self,name:str,func:Callable,client) :
@@ -91,7 +92,7 @@ class InfluxMqttServer (object) :
     def clientRun(self,name:str,msgQ:Queue,runFlag:Event,publish:Callable,client) -> None:
         logger.info(f"Client {name} waiting to start")
         self.startFlag.wait()
-        logger.info(f"Client {name} started on {msgQ} {runFlag}")
+        logger.debug(f"Client {name} started on {msgQ} {runFlag}")
 
         while runFlag.is_set() :
             try:
@@ -116,7 +117,7 @@ class InfluxMqttServer (object) :
 
         try:
             asJson = json.loads(m.payload)
-            logger.info(f"Parsed Received Message: {m.payload}")
+            logger.debug(f"Parsed Received Message: {m.payload}")
         except json.JSONDecodeError as jde:
             logger.warning(f"Parse error: {m.payload}")
 
@@ -141,7 +142,7 @@ class InfluxMqttServer (object) :
             ts = data['data']['timestamp']
             tmp = tmp.time(ts,write_precision=WritePrecision.S)
             p = tmp
-            logger.info(f"Successfully converted to Influx Point")
+            logger.debug(f"Successfully converted to Influx Point")
         except KeyError as ke:
             logger.error(f"Invalid key {ke}")
 
@@ -157,7 +158,7 @@ class InfluxMqttServer (object) :
                 tpl = self.clients[c]
                 msgQ = tpl[1]
                 if msgQ is not None :
-                    logger.info(f"Putting to {msgQ}")
+                    logger.debug(f"Putting to {msgQ}")
                     msgQ.put((m.topic,payload))
 
             if False:
@@ -171,12 +172,12 @@ class InfluxMqttServer (object) :
     def run(self) :
         self.init()
 
-        logger.info(f"Starting MQTT Subscriber/Listener")
+        logger.debug(f"Starting MQTT Subscriber/Listener")
         self.mqttClient.mqClient.loop_start()
 
 
     def terminate(self) :
-        logger.info(f"Terminating MQTT Client/Listener")
+        logger.debug(f"Terminating MQTT Client/Listener")
         self.mqttClient.terminate()
         for c in self.clients:
             thr,q,evt,f,cli = self.clients[c]

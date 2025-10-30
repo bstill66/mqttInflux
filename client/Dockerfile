@@ -77,5 +77,6 @@ CMD "python3" "${APP_DIR}/client/AircraftClient.py"  \
               "-L" "${LOG_DIR}"  \
               "-u" "${MQTT_USER}" \
               "-p" "${MQTT_PASSWORD}" \
-              "-M" "${MSI_HOST}" \
-              "-K" "${CFG_DIR}/DalKinesis.cfg"
+              "-M" "${MSI_HOST}"
+
+#              "-K" "${CFG_DIR}/DalKinesis.cfg"

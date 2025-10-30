@@ -16,7 +16,7 @@ class ViasatMSI(object) :
     def query(self) -> dict:
 
         try:
-            if False:
+            if True:
 
                     rsp = requests.get(self.url,timeout=2.5,
                                        headers={'Accept': 'application/json'})
