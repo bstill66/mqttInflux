@@ -21,7 +21,7 @@ from common.KinesisClient import KinesisClient
 from common.MqttClient import MqttClient
 from InfluxClient import InfluxClient
 from common.MsiToOcc import transform
-from server.TestFileGen import TestFileGen
+
 
 #MQTT_SERVER = "192.168.1.200"
 #MQTT_SERVER = "104.53.51.51"
@@ -150,9 +150,10 @@ class InfluxMqttServer (object) :
 
     def process(self,m:MQTTMessage) :
         payload = self.parse(m)
+        topic   = m.topic
 
         if (payload is not None) :
-            logger.info(payload)
+            logger.info(f"RX-> TOPIC[{topic}] PAYLOAD[{payload}]")
 
             for c in self.clients.keys() :
                 tpl = self.clients[c]
@@ -290,7 +291,7 @@ if __name__ == "__main__" :
 
         pub = MqttClient(params.mqttBroker,1883,user=params.user,passwd=params.password,
                          clientID=f"test-{random.randint(0,10_000)}")
-        testgen = TestFileGen(pub,params.testMode)
+        #testgen = TestFileGen(pub,params.testMode)
     else:
         pub = None
         testgen = None

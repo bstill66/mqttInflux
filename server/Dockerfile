@@ -54,7 +54,7 @@ RUN pip install influxdb_client
 COPY ./server/*.py  ${APP_DIR}/server/
 
 # Copy in the common code
-RUN mkdir ${APP_DIR}/common
+RUN mkdir -p ${APP_DIR}/common
 COPY ./common/MqttClient.py     ${APP_DIR}/common/MqttClient.py
 COPY ./common/Client.py         ${APP_DIR}/common/Client.py
 COPY ./common/KinesisClient.py  ${APP_DIR}/common/KinesisClient.py
@@ -72,7 +72,7 @@ ENV INFLUX_SERVER=${INFLUX_SERVER}
 
 
 ENV PYTHONPATH="${APP_DIR}"
-CMD "python3" "${APP_DIR}/server/InfluxMqttServer.py"  \
+CMD "python3" "${APP_DIR}/server/InfluxMqttServer.py" \
               "-b" "${MQTT_URL}" \
               "-L" "${LOG_DIR}"  \
               "-u" "${MQTT_USER}" \

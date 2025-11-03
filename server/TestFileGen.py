@@ -7,7 +7,7 @@ from argparse import Namespace, ArgumentParser
 from datetime import datetime, timezone
 from multiprocessing import Event
 from time import sleep
-from venv import __main__
+
 
 from common.MqttClient import MqttClient
 
@@ -18,7 +18,7 @@ MSI_SAMPLE = '''
 '''
 
 class TestFileGen(object) :
-    SAMPLE_RE = re.compile(r".*:TOPIC:\[(?P<TOPIC>.*)\\]\sPAYLOAD:\[(?P<PAYLOAD>.*)\\].*")
+    SERVER_RE = re.compile(r"INFO:root:Message received: b'(?P<PAYLOAD>.*)'")
     TOPIC_RE  = re.compile("Delta/(?P<TAIL>[a-zA-z]{1}\\d{3}[a-zA-z]{2})/(?P<FLIGHT>[a-zA-z]{3}\\d+)/MSI")
 
     def __init__(self,client:MqttClient,fnames) :
@@ -60,15 +60,19 @@ class TestFileGen(object) :
             for fname in self.filenames :
                 with open(fname) as f :
                     for line in f:
-                        m = self.SAMPLE_RE.match(line)
+                        m = self.SERVER_RE.match(line)
                         if m is not None:
-                            logger.info(f"{m.group('TOPIC')}:{m.group('PAYLOAD')}")
+                            #logger.info(f"{m.group('TOPIC')}:{m.group('PAYLOAD')}")
                             payload = m.group("PAYLOAD")
                             #payload = self.cvtToPublisher(MSI_SAMPLE)
                             #topic   = "Delta/NXXXUS/DAL345/MSI"
-                            topic    = m.group("TOPIC")
+                            #topic    = m.group("TOPIC")
+                            topic = "Delta/NXXXBS/DL998/MSI"
                             self.mqtt.publish(topic,payload)
                             sleep(0.5)
+
+
+
         except FileNotFoundError :
             logger.warning("File {fname} not found")
 
@@ -121,13 +125,13 @@ def parseCmdLine(args) -> Namespace :
     return parser.parse_args(args)
 
 
-if __name__ == __main__ :
+if __name__ == "__main__" :
     params = parseCmdLine(sys.argv[1:])
 
     pub = MqttClient(params.mqttBroker, 1883, user=params.user, passwd=params.password,
                      clientID=f"test-{random.randint(0, 10_000)}")
     pub.run()
 
-    testgen = TestFileGen(pub, params.testFiles,params.topic)
+    testgen = TestFileGen(pub, params.testFiles)
     testgen.run()
 

@@ -99,7 +99,7 @@ class MqttClient(object) :
 
     def onMessage(self,client:Client,msg) :
         self.subRxCount += 1
-        logger.info(f"Message received: " + str(msg.payload))
+        logger.info(f"Message received: {msg.payload.decode('utf-8')}")
 
         for k in self.topics:
             pat,usrFunc,usrData = self.topics[k]
