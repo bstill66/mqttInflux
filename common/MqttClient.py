@@ -49,11 +49,14 @@ class MqttClient(object) :
         self.topics = {}
 
     def onConnect(self,client:Client,flags,rc,prop) :
-        logger.info("Connected with result code "+str(rc))
+        if rc == 0:
+            logger.info("Connected !!!")
+        else:
+            logger.warning(f"Unable to connect: {str(rc)}")
 
     @staticmethod
     def _onConnect(client, ud, flags, rc, prop) :
-        logger.info(f"Connected to MQTT Broker @ {ud.server}:{ud.port}")
+        #logger.info(f"Connected to MQTT Broker @ {ud.server}:{ud.port}")
         if hasattr(ud,'onConnect') :
             ud.onConnect(client,flags,rc,prop)
 
@@ -74,7 +77,7 @@ class MqttClient(object) :
 
         reconnect_count = 0
         reconnect_delay = 0
-        while reconnect_count < self.MAX_RECONNECT_COUNT and not self.abort.is_set():
+        while self.abort.is_set():
             logger.info("Reconnecting in %d seconds...", reconnect_delay)
             sleep(reconnect_delay)
 
@@ -111,8 +114,8 @@ class MqttClient(object) :
 
 
     def doConnect(self,srvr:str,port:int) -> bool :
-        if self.mqClient.connect(self.server, self.port, 60) != 0:
-            logger.warning("Couldn't connect to the mqtt broker")
+        if self.mqClient.connect(host=self.server, port=self.port) != 0:
+            logger.error(f"Couldn't connect to the mqtt broker on port {self.port}")
             return False
         return True
 
@@ -150,9 +153,12 @@ class MqttClient(object) :
         while not self.abort.is_set() and not connected :
             try:
                 connected = self.doConnect(self.server,self.port)
+                connected = True
             except OSError as err:
                 sleep(self.FIRST_RECONNECT_DELAY)
                 connected = False
+            finally:
+                pass #connected = True
 
         self.mqClient.loop_start()
 

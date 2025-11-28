@@ -62,9 +62,21 @@ class InfluxMqttServer (object) :
 
         topic = "Delta/+/+/MSI"
         self.mqttClient.subscribe(topic,lambda m,u: u.process(m),self)
+        self.mqttClient.subscribe("Delta/+/+/DSS",lambda m,u: u.process(m),self)
+        self.mqttClient.subscribe("Delta/+/+/UI",lambda m,u: u.process(m),self)
+
+        self.dss = None
+
         logger.info(f"Subscribed to: '{topic}'")
 
         self.startFlag.set()
+
+
+    def writePaxData(self,topic:str,payload:dict,db) :
+        pt,ts = self.extractPax(topic,payload)
+        if pt is not None:
+            db.write(ts,pt)
+            logger.info("Wrote Passenger Record to DB")
 
     def writeToInflux(self,topic:str,payload:dict,db) :
         pt, ts = self.cvtToPoint(topic, payload)
@@ -123,6 +135,30 @@ class InfluxMqttServer (object) :
 
         return asJson
 
+    def extractPax(self,topic:str,data:dict) :
+        p = None
+        ts = None
+        tpc = topic.split('/')
+        typ = tpc[-1]
+
+        try:
+            tmp = Point(tpc[1])
+            if len(tpc) >= 3 :
+                tmp.tag("Source",tpc[3])
+                tmp.tag("regNum",tpc[1])
+                tmp.tag("fltNum",tpc[2])
+
+            for k in data['data'].keys():
+                tmp.field(k, data['data'][k])
+
+            ts = data['header']['timestamp']
+            tmp = tmp.time(ts, write_precision=WritePrecision.S)
+            p = tmp
+        except KeyError as ke:
+            logger.error(f"Invalid key {ke}")
+
+        return p,ts
+
     def cvtToPoint(self,topic:str,data) -> Point :
         p = None
         ts = None
@@ -147,6 +183,12 @@ class InfluxMqttServer (object) :
             logger.error(f"Invalid key {ke}")
 
         return p,ts
+
+    def processDss(self,m:MQTTMessage) :
+        logger.info("Processing DSS Message")
+        if self.dss is not None:
+            self.dss.msgQ.put((m.topic,json.loads(m.payload)))
+
 
     def process(self,m:MQTTMessage) :
         payload = self.parse(m)
@@ -275,9 +317,13 @@ if __name__ == "__main__" :
 
         influxWriter = InfluxClient(params.influxServer, params.bucket, org="Brian Still", token=INFLUX_APIKEY)
         influxWriter.createBucket(params.bucket)
+
+        dssWriter = InfluxClient(params.influxServer,"Passenger",org="Brian Still",token=INFLUX_APIKEY)
+        dssWriter.createBucket("Passenger")
+
         logger.info(f"Successfully created bucket")
         server.addClient("InfluxWriter", server.writeToInflux, influxWriter)
-
+        server.addClient("DssWriter",server.writePaxData,dssWriter)
 
         if params.kinesisConfig is not None:
             kclient = KinesisClient(params.kinesisConfig)

@@ -29,6 +29,9 @@ class AircraftClient(object) :
         self.startFlag = Event()
         self.clients = {}
 
+        self.tailNum = None
+        self.flightNum = None
+
     def addClient(self,name:str,func:Callable,client) :
         q = Queue()
         evt = Event()
